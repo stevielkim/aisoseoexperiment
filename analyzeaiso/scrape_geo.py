@@ -13,7 +13,7 @@ import undetected_chromedriver as uc
 from selenium.webdriver.support import expected_conditions as EC
 
 # Input File
-QUERY_FILE = '/Users/stephaniekim/development/seoaso/analyzeseo/data/seo_aso_prompts.txt'
+QUERY_FILE = '/Users/stephaniekim/development/seoaso/seo_vs_aiso_analysis/queries/seo_aso_prompts.txt'
 PERPLEXITY_OUTPUT_DIR = 'perplexity_search_results_html'
 GOOGLE_AI_OUTPUT_DIR = 'google_ai_search_results_html'
 BING_AI_OUTPUT_DIR = 'bing_ai_search_results_html'
@@ -124,41 +124,70 @@ def fetch_google_ai_page(query):
         print(f"Error fetching Google AI results for {query}: {e}")
 
 
-def fetch_bing_ai_page(query):
+
+def fetch_bing_ai_page(query: str):
+    """Load Bing SERP, switch to Copilot tab, expand the answer, save HTML."""
     search_url = f"https://www.bing.com/search?q={query.replace(' ', '+')}"
     try:
         driver.get(search_url)
-        wait = WebDriverWait(driver, 15)
+        wait = WebDriverWait(driver, 20)
 
-        # Simulate scrolling to ensure Copilot loads
-        body = driver.find_element(By.TAG_NAME, 'body')
+        # 1) Scroll to trigger Copilot tab render
+        body = driver.find_element(By.TAG_NAME, "body")
         for _ in range(3):
             body.send_keys(Keys.PAGE_DOWN)
-            time.sleep(random.uniform(1, 2))
+            time.sleep(random.uniform(0.8, 1.5))
 
-        # Try to locate and click the Copilot tab
+        # 2) Click Copilot tab if visible
         try:
-            copilot_tab = wait.until(EC.element_to_be_clickable((By.XPATH, '//div[contains(text(),"Copilot")]')))
+            copilot_tab = wait.until(
+                EC.element_to_be_clickable((By.XPATH, '//div[contains(text(),"Copilot")]'))
+            )
             copilot_tab.click()
-            print("Clicked Copilot tab")
-        except Exception as e:
-            print(f"Copilot tab not found or not clickable: {e}")
-        
-        # Wait for Copilot AI response content to appear
-        try:
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'cib-serp')))
-            print("Copilot AI response loaded")
-        except Exception as e:
-            print(f"Copilot response not detected: {e}")
+            print("✓ Copilot tab clicked")
+        except Exception:
+            print("⚠️ Copilot tab not found - proceeding (may be auto-open)")
 
-        # Save the full page source
-        output_file = os.path.join(BING_AI_OUTPUT_DIR, f"{query.replace(' ', '_')}_bing_ai.html")
-        with open(output_file, 'w', encoding='utf-8') as page_file:
-            page_file.write(driver.page_source)
-        print(f"Saved Bing Copilot AI page source for query: {query}")
+        # 3) Wait for Copilot answer block (new <cib-serp> tag or legacy .b_factrow)
+        try:
+            wait.until(
+                EC.any_of(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "cib-serp")),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.b_factrow"))
+                )
+            )
+            print("✓ Copilot answer detected")
+        except Exception:
+            print("⚠️ Copilot answer not detected within timeout")
+
+        # 4) Click "Show more" inside Copilot if present
+        try:
+            show_more = wait.until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, '//button[contains(text(),"Show more")]')
+                )
+            )
+            show_more.click()
+            print("✓ Copilot ‘Show more’ clicked")
+            time.sleep(2)  # give it a moment to render extra citations
+        except Exception:
+            print("ℹ️ No 'Show more' button visible")
+
+        # 5) Final scroll to bottom so all lazy-loaded anchors render
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(1)
+
+        # 6) Save page source
+        out_path = os.path.join(
+            BING_AI_OUTPUT_DIR, f"{query.replace(' ', '_')}_bing_ai.html"
+        )
+        with open(out_path, "w", encoding="utf-8") as fh:
+            fh.write(driver.page_source)
+        print(f"✓ Saved Copilot HTML → {out_path}")
 
     except Exception as e:
-        print(f"Error fetching Bing AI Copilot results for {query}: {e}") 
+        print(f"❌ Error fetching Bing Copilot for “{query}”: {e}")
+
 
 
 # Collect Results for All AI Search Engines
