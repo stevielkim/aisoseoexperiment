@@ -1,7 +1,12 @@
-import re, pandas as pd, numpy as np
+import re
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
+import os
 
 
 # ------------------------------------------------------
@@ -9,6 +14,7 @@ from sklearn.pipeline import make_pipeline
 # ------------------------------------------------------
 AI_CSV_PATH = "ai_serp_analysis.csv"          # update if needed
 ai_df = pd.read_csv(AI_CSV_PATH)
+ai_df["Included"] = ai_df["Included"].astype(int)   # True → 1, False → 0
 
 
 # Ensure numeric count exists (if you ever ingest rows without it)
@@ -58,7 +64,7 @@ def top_inclusion_features(ai_df: pd.DataFrame, n: int = 8) -> pd.DataFrame:
     
     pipe = make_pipeline(
         StandardScaler(),
-        LogisticRegression(max_iter=300, solver="liblinear")
+        LogisticRegression(max_iter=1000, solver="lbfgs", random_state=42)
     )
     pipe.fit(X, y)
     coefs = pipe.named_steps["logisticregression"].coef_[0]
@@ -79,9 +85,44 @@ top_n = 8
 try:
     top_feats = top_inclusion_features(ai_df, n=top_n)
     print(f"\nTop {top_n} features that raise odds of inclusion:")
-    print(top_feats)          # Jupyter/IPython – falls back to print if not in notebook
+    print(top_feats)          
 except ValueError as err:
     print(err)
+
+def plot_ai_inclusion_dashboard(df, feat_table, save_path="ai_inclusion_dashboard.png"):
+    """Create and save AI inclusion analysis dashboard."""
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+    
+    # 1) Odds-ratio
+    feat_sorted = feat_table.sort_values("Odds-multiplier")
+    axes[0].barh(feat_sorted["Feature"], feat_sorted["Odds-multiplier"], color="#4c72b0")
+    axes[0].axvline(1, ls="--", c="k")
+    axes[0].set_title("Odds ratio")
+    axes[0].set_xlabel("Odds-multiplier")
+    
+    # 2) Rank bucket lift
+    buckets = pd.cut(df["Page Rank"], [0, 1, 3, 10, np.inf], labels=["1", "2–3", "4–10", "11+"])
+    rank_data = df.groupby(buckets, observed=True)["Included"].mean().mul(100)
+    axes[1].bar(range(len(rank_data)), rank_data.values, color="#dd8452")
+    axes[1].set_xticks(range(len(rank_data)))
+    axes[1].set_xticklabels(rank_data.index, rotation=0)
+    axes[1].set_ylabel("% cited")
+    axes[1].set_title("Baseline by rank")
+    
+    # 3) Word-count violin
+    sns.violinplot(x="Included", y="Word Count", data=df, inner="quartile",
+                   hue="Included", palette="Pastel1", ax=axes[2], legend=False)
+    axes[2].set_xticks([0, 1])
+    axes[2].set_xticklabels(["No", "Yes"])
+    axes[2].set_title("Word count spread")
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"Dashboard saved to: {save_path}")
+    plt.show()
+
 
 # ------------------------------------------------------
 # Page-Rank vs Inclusion: descriptive and correlation view
@@ -118,3 +159,12 @@ def rank_vs_inclusion(ai_df, max_rank=20):
 rank_summary = rank_vs_inclusion(ai_df, max_rank=10)
 print("\nPage-Rank bucket summary (Top 10 ranks):")
 print(rank_summary)   # use print(rank_summary) outside Jupyter
+print(top_feats)
+print("Columns in top_feats:", top_feats.columns.tolist())
+
+# Create output directory if it doesn't exist
+os.makedirs("plots", exist_ok=True)
+
+# Generate and save the dashboard
+plot_ai_inclusion_dashboard(ai_df, top_feats, save_path="plots/ai_inclusion_dashboard.png")
+print(ai_df["Included"].value_counts())   # should output something like 320 zeros, 35 ones
