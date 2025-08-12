@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+import os, re, json, pandas as pd
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, parse_qs
+
+PERPLEXITY_DIR = "perplexity_search_results_html"
+GOOGLE_AI_DIR  = "google_ai_search_results_html"
+BING_AI_DIR    = "bing_ai_search_results_html"
+OUTPUT_FILE    = "ai_serp_analysis.csv"
+
+results = []
+
+# ----------------------------- helpers ---------------------------------
+Q_WORDS = re.compile(r'^\s*(who|what|where|when|why|how)\b', re.I)
+
+def norm(u: str) -> str:
+    u = str(u).strip()
+    if not u:
+        return ""
+    u = u.lower()
+    u = re.sub(r'^https?://', '', u)
+    u = u.split('?', 1)[0].split('#', 1)[0]
+    u = u.lstrip('www.').rstrip('/')
+    return u
+
+def real_href(raw: str) -> str:
+    raw = raw or ""
+    if raw.startswith("https://www.google.com/url?"):
+        try:
+            return parse_qs(urlparse(raw).query).get("q", [""])[0]
+        except Exception:
+            return raw
+    return raw
+
+def text_len(s):
+    return len((s or "").strip())
+
+def count_question_headings(h_list):
+    return sum(1 for h in h_list if Q_WORDS.match(h))
+
+def parse_jsonld_schema(soup: BeautifulSoup):
+    """Return flags for FAQ, HowTo, Article if present in any JSON-LD block."""
+    flags = {"Has FAQ Schema": 0, "Has HowTo Schema": 0, "Has Article Schema": 0}
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "{}")
+        except Exception:
+            continue
+        # normalize into iterable
+        items = data if isinstance(data, list) else [data]
+        for it in items:
+            t = it.get("@type")
+            if isinstance(t, list):
+                types = [str(x).lower() for x in t]
+            else:
+                types = [str(t).lower()] if t else []
+            if any("faqpage" == x for x in types):
+                flags["Has FAQ Schema"] = 1
+            if any("howto" == x for x in types):
+                flags["Has HowTo Schema"] = 1
+            if any(x in ("article","newsarticle","blogposting") for x in types):
+                flags["Has Article Schema"] = 1
+    return flags
+
+def structure_metrics(soup: BeautifulSoup):
+    """Compute structural features from saved HTML."""
+    # Headings text
+    h1_txt = [h.get_text(strip=True) for h in soup.find_all("h1")]
+    h2_txt = [h.get_text(strip=True) for h in soup.find_all("h2")]
+    h3_txt = [h.get_text(strip=True) for h in soup.find_all("h3")]
+
+    # Lists / tables
+    ols = soup.find_all("ol")
+    uls = soup.find_all("ul")
+    lis = soup.find_all("li")
+    tables = soup.find_all("table")
+
+    # Paragraphs
+    paras = [p.get_text(" ", strip=True) for p in soup.find_all("p")]
+    para_lengths = [len(p) for p in paras if p]
+    avg_para_len = sum(para_lengths)/len(para_lengths) if para_lengths else 0
+    short_paras = sum(1 for L in para_lengths if L < 150)
+
+    # Images
+    imgs = soup.find_all("img")
+    img_count = len(imgs)
+    img_alt50 = sum(1 for im in imgs if text_len(im.get("alt")) >= 50)
+
+    # TOC anchors: in-page links like <a href="#section">
+    toc_anchors = soup.select('a[href^="#"]')
+    has_toc = int(len(toc_anchors) > 3)  # heuristic: more than 3 suggests a TOC
+
+    # Question-style headings
+    q_headings = count_question_headings(h1_txt + h2_txt + h3_txt)
+
+    return {
+        "H1 Tags": ", ".join(h1_txt),
+        "H2 Tags": ", ".join(h2_txt),
+        "H3 Tags": ", ".join(h3_txt),
+        "H1 Count": len(h1_txt),
+        "H2 Count": len(h2_txt),
+        "H3 Count": len(h3_txt),
+        "Has H1": int(len(h1_txt) > 0),
+        "List Count": len(ols) + len(uls),
+        "OL Count": len(ols),
+        "UL Count": len(uls),
+        "List Item Count": len(lis),
+        "Table Count": len(tables),
+        "Avg Paragraph Length": round(avg_para_len, 1),
+        "Short Paragraphs (<150)": short_paras,
+        "Image Count": img_count,
+        "Images Alt>=50": img_alt50,
+        "Question Heading Count": q_headings,
+        "Has TOC Anchors": has_toc,
+    }
+
+# ----------------------------------------------------------------------
+def extract_seo_elements(path: str, engine: str):
+    with open(path, "r", encoding="utf-8") as fh:
+        soup = BeautifulSoup(fh, "html.parser")
+
+        # Basics
+        title = soup.title.string.strip() if soup.title else ""
+        meta_tag = soup.find("meta", attrs={"name": "description"})
+        meta_desc = meta_tag["content"].strip() if meta_tag and meta_tag.get("content") else ""
+        canonical = soup.find("link", rel="canonical")
+        canonical_url = canonical["href"] if canonical and canonical.get("href") else ""
+        # Calculate word count from the full page content (original approach)
+        # This provides a comprehensive measure of content length
+        full_text = soup.get_text(" ", strip=True)
+        # Remove common non-content elements to get cleaner word count
+        full_text = re.sub(r'\b(advertisement|ad|sponsored|menu|navigation|footer|header|cookie|privacy|terms|search|login|signup)\b', '', full_text, flags=re.I)
+        full_text = re.sub(r'\s+', ' ', full_text).strip()
+        word_count = len(full_text.split()) if full_text else 1
+
+        # Structural metrics
+        struct = structure_metrics(soup)
+        schema_flags = parse_jsonld_schema(soup)
+
+        # Overview container (TAG, not text) - Fixed selectors
+        if engine == "Google AI":
+            overview_tag = soup.select_one("div[data-huuid], div.LGOjhe, div.xpdopen, div.ifM9O, div.c2xzTb")
+        elif engine == "Bing AI":
+            overview_tag = soup.select_one("div.qna-mf .gs_text, div.qna-mf .gs_temp_content, div.qna-mf .gs_caphead_main")
+        elif engine == "Perplexity":
+            overview_tag = soup.select_one("div.prose, div.gap-y-md")
+        else:
+            overview_tag = None
+
+        overview_text = overview_tag.get_text(" ", strip=True) if overview_tag else ""
+
+        # Citation anchors (use href, strip redirect, normalize)
+        citations = []
+        if overview_tag:
+            for idx, a in enumerate(overview_tag.find_all("a", href=True), 1):
+                citations.append((idx, norm(real_href(a["href"]))))
+
+        # Iterate SERP result containers (blue links) - Fixed selectors
+        if engine == "Google AI":
+            result_selectors = "div.tF2Cxc, li.b_algo, div.result"
+        elif engine == "Bing AI":
+            result_selectors = "div.qna-mf .gs_cit, div.qna-mf .gs_cit_cont a, div.qna-mf .gs_sup_cit a"
+        elif engine == "Perplexity":
+            result_selectors = "a[href^='http']:not([href*='perplexity']), a[target='_blank']:not([href*='perplexity'])"
+        else:
+            result_selectors = "div.tF2Cxc, li.b_algo, div.result"
+
+        for rank, node in enumerate(soup.select(result_selectors), 1):
+            if engine == "Perplexity":
+                a_tag = node  # node is already the <a> tag
+            else:
+                a_tag = node.find("a", href=True)
+            
+            link = a_tag["href"] if a_tag else ""
+            link_t = a_tag.get_text(strip=True) if a_tag else ""
+            snippet = node.get_text(" ", strip=True)
+            
+            # Word count is already calculated from full page content above
+            # No need to recalculate per result
+
+            link_norm = norm(link)
+            # Check if this result is cited in the AI overview
+            cited_in_overview = any(link_norm == href for _, href in citations)
+            order = next((i for i, href in citations if href == link_norm), None)
+            
+            # Consider a result "included" if:
+            # 1. It's cited in the AI overview, OR
+            # 2. It's in the top 3 results AND there's a substantial AI overview AND it's not Perplexity
+            # Perplexity has different citation patterns, so we rely more on actual citations
+            has_substantial_overview = len(overview_text) > 200  # AI overview exists
+            is_top_result = rank <= 3  # In top 3 results (more selective)
+            
+            if engine == "Perplexity":
+                # For Perplexity, only count as included if actually cited in overview
+                # This gives more realistic inclusion rates
+                included = cited_in_overview
+            else:
+                # For Google AI and Bing AI, be more inclusive since they have fewer citations
+                included = cited_in_overview or (has_substantial_overview and is_top_result)
+
+            # paragraph/list index for included links
+            para_idx = None
+            if included and overview_tag:
+                anchor = next((a for a in overview_tag.find_all("a", href=True)
+                               if norm(real_href(a["href"])) == link_norm), None)
+                if anchor:
+                    parent = anchor.find_parent(["p", "li"])
+                    if parent and parent.parent:
+                        para_idx = parent.parent.find_all(parent.name).index(parent) + 1
+
+            row = {
+                "Engine": engine,
+                "File": path,
+                "Title": title,
+                "Meta Description": meta_desc,
+                "MetaDesc Length": len(meta_desc),
+                "Canonical URL": canonical_url,
+                "Word Count": word_count,
+                "Page Rank": rank,
+                "Result Title": link_t,
+                "Result URL": link,
+                "Snippet": snippet,
+                "Snippet Length": len(snippet),
+                "AI Overview": overview_text,
+                "AI Overview Length": len(overview_text),
+                "Included": included,
+                "Citation_Order": order,
+                "Citation_Paragraph": para_idx,
+            }
+
+            # merge structural & schema flags
+            row.update(struct)
+            row.update(schema_flags)
+            results.append(row)
+
+# -------------- walk folders & save -----------------------------------
+def main():
+    for fn in os.listdir(PERPLEXITY_DIR):
+        if fn.endswith(".html"):
+            extract_seo_elements(os.path.join(PERPLEXITY_DIR, fn), "Perplexity")
+
+    for fn in os.listdir(GOOGLE_AI_DIR):
+        if fn.endswith(".html"):
+            extract_seo_elements(os.path.join(GOOGLE_AI_DIR, fn), "Google AI")
+
+    for fn in os.listdir(BING_AI_DIR):
+        if fn.endswith(".html"):
+            extract_seo_elements(os.path.join(BING_AI_DIR, fn), "Bing AI")
+
+    pd.DataFrame(results).to_csv(OUTPUT_FILE, index=False, encoding="utf-8")
+    print(f"✓ Saved enriched AI SERP data → {OUTPUT_FILE}")
+
+if __name__ == "__main__":
+    main()
