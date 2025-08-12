@@ -40,16 +40,26 @@ def count_question_headings(h_list):
 
 def parse_jsonld_schema(soup: BeautifulSoup):
     """Return flags for FAQ, HowTo, Article if present in any JSON-LD block."""
-    # Note: This function is not applicable for SERP pages since schema markup
-    # is on the actual content pages, not search result pages.
-    # For now, return default values since we're analyzing SERP structure.
     flags = {"Has FAQ Schema": 0, "Has HowTo Schema": 0, "Has Article Schema": 0}
-    
-    # TODO: If we want to analyze schema impact, we would need to:
-    # 1. Scrape the actual result pages (not SERP pages)
-    # 2. Extract schema markup from those pages
-    # 3. Correlate with inclusion rates
-    
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "{}")
+        except Exception:
+            continue
+        # normalize into iterable
+        items = data if isinstance(data, list) else [data]
+        for it in items:
+            t = it.get("@type")
+            if isinstance(t, list):
+                types = [str(x).lower() for x in t]
+            else:
+                types = [str(t).lower()] if t else []
+            if any("faqpage" == x for x in types):
+                flags["Has FAQ Schema"] = 1
+            if any("howto" == x for x in types):
+                flags["Has HowTo Schema"] = 1
+            if any(x in ("article","newsarticle","blogposting") for x in types):
+                flags["Has Article Schema"] = 1
     return flags
 
 def structure_metrics(soup: BeautifulSoup):
@@ -115,23 +125,17 @@ def extract_seo_elements(path: str, engine: str):
         meta_desc = meta_tag["content"].strip() if meta_tag and meta_tag.get("content") else ""
         canonical = soup.find("link", rel="canonical")
         canonical_url = canonical["href"] if canonical and canonical.get("href") else ""
-        # Calculate word count from the full page content (original approach)
-        # This provides a comprehensive measure of content length
-        full_text = soup.get_text(" ", strip=True)
-        # Remove common non-content elements to get cleaner word count
-        full_text = re.sub(r'\b(advertisement|ad|sponsored|menu|navigation|footer|header|cookie|privacy|terms|search|login|signup)\b', '', full_text, flags=re.I)
-        full_text = re.sub(r'\s+', ' ', full_text).strip()
-        word_count = len(full_text.split()) if full_text else 1
+        word_count = len(re.findall(r"\w+", soup.get_text()))
 
         # Structural metrics
         struct = structure_metrics(soup)
         schema_flags = parse_jsonld_schema(soup)
 
-        # Overview container (TAG, not text) - Fixed selectors
+        # Overview container (TAG, not text)
         if engine == "Google AI":
-            overview_tag = soup.select_one("div[data-huuid], div.LGOjhe, div.xpdopen, div.ifM9O, div.c2xzTb")
+            overview_tag = soup.select_one("div.LGOjhe, div.ifM9O, div.KpMaL, div.SPZz6b, div.vk_c, ul.zVKf0d")
         elif engine == "Bing AI":
-            overview_tag = soup.select_one("div.qna-mf .gs_text, div.qna-mf .gs_temp_content, div.qna-mf .gs_caphead_main")
+            overview_tag = soup.select_one("cib-serp, div.b_factrow, div.dg_b, div.b_vlist2col")
         elif engine == "Perplexity":
             overview_tag = soup.select_one("div.prose, div.gap-y-md")
         else:
@@ -145,48 +149,16 @@ def extract_seo_elements(path: str, engine: str):
             for idx, a in enumerate(overview_tag.find_all("a", href=True), 1):
                 citations.append((idx, norm(real_href(a["href"]))))
 
-        # Iterate SERP result containers (blue links) - Fixed selectors
-        if engine == "Google AI":
-            result_selectors = "div.tF2Cxc, li.b_algo, div.result"
-        elif engine == "Bing AI":
-            result_selectors = "div.qna-mf .gs_cit, div.qna-mf .gs_cit_cont a, div.qna-mf .gs_sup_cit a"
-        elif engine == "Perplexity":
-            result_selectors = "a[href^='http']:not([href*='perplexity']), a[target='_blank']:not([href*='perplexity'])"
-        else:
-            result_selectors = "div.tF2Cxc, li.b_algo, div.result"
-
-        for rank, node in enumerate(soup.select(result_selectors), 1):
-            if engine == "Perplexity":
-                a_tag = node  # node is already the <a> tag
-            else:
-                a_tag = node.find("a", href=True)
-            
+        # Iterate SERP result containers (blue links)
+        for rank, node in enumerate(soup.select("div.tF2Cxc, li.b_algo, div.result"), 1):
+            a_tag = node.find("a", href=True)
             link = a_tag["href"] if a_tag else ""
             link_t = a_tag.get_text(strip=True) if a_tag else ""
             snippet = node.get_text(" ", strip=True)
-            
-            # Word count is already calculated from full page content above
-            # No need to recalculate per result
 
             link_norm = norm(link)
-            # Check if this result is cited in the AI overview
-            cited_in_overview = any(link_norm == href for _, href in citations)
+            included = any(link_norm == href for _, href in citations)
             order = next((i for i, href in citations if href == link_norm), None)
-            
-            # Consider a result "included" if:
-            # 1. It's cited in the AI overview, OR
-            # 2. It's in the top 3 results AND there's a substantial AI overview AND it's not Perplexity
-            # Perplexity has different citation patterns, so we rely more on actual citations
-            has_substantial_overview = len(overview_text) > 200  # AI overview exists
-            is_top_result = rank <= 3  # In top 3 results (more selective)
-            
-            if engine == "Perplexity":
-                # For Perplexity, only count as included if actually cited in overview
-                # This gives more realistic inclusion rates
-                included = cited_in_overview
-            else:
-                # For Google AI and Bing AI, be more inclusive since they have fewer citations
-                included = cited_in_overview or (has_substantial_overview and is_top_result)
 
             # paragraph/list index for included links
             para_idx = None
