@@ -40,26 +40,16 @@ def count_question_headings(h_list):
 
 def parse_jsonld_schema(soup: BeautifulSoup):
     """Return flags for FAQ, HowTo, Article if present in any JSON-LD block."""
+    # Note: This function is not applicable for SERP pages since schema markup
+    # is on the actual content pages, not search result pages.
+    # For now, return default values since we're analyzing SERP structure.
     flags = {"Has FAQ Schema": 0, "Has HowTo Schema": 0, "Has Article Schema": 0}
-    for tag in soup.find_all("script", type="application/ld+json"):
-        try:
-            data = json.loads(tag.string or "{}")
-        except Exception:
-            continue
-        # normalize into iterable
-        items = data if isinstance(data, list) else [data]
-        for it in items:
-            t = it.get("@type")
-            if isinstance(t, list):
-                types = [str(x).lower() for x in t]
-            else:
-                types = [str(t).lower()] if t else []
-            if any("faqpage" == x for x in types):
-                flags["Has FAQ Schema"] = 1
-            if any("howto" == x for x in types):
-                flags["Has HowTo Schema"] = 1
-            if any(x in ("article","newsarticle","blogposting") for x in types):
-                flags["Has Article Schema"] = 1
+    
+    # TODO: If we want to analyze schema impact, we would need to:
+    # 1. Scrape the actual result pages (not SERP pages)
+    # 2. Extract schema markup from those pages
+    # 3. Correlate with inclusion rates
+    
     return flags
 
 def structure_metrics(soup: BeautifulSoup):
