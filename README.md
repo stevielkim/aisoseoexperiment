@@ -1,11 +1,11 @@
-## Understanding Importance of Content Optimization For SEO vs AISO rankings 
-*Content stand-off between SEO and AISO - does it really matter if you optimize for one vs the other?*
+## Understanding Importance of Content Optimization For SEO vs AEO rankings 
+*Content stand-off between SEO and AEO - does it really matter if you optimize for one vs the other?*
 
 This in-progress project compares traditional SEO search results with AI-generated answers from Google AI Overviews, Perplexity, and Bing Copilot. 
 
 ### Goal
 Run an experiment to discover if the same content is prioritized by traditional search engines vs AI search engines/overviews,
-so we as product and marketing professionals understand if it's critical to rewrite content to optimize for AISO.
+so we as product and marketing professionals understand if it's critical to rewrite content to optimize for AEO or if we can rely on traditional SEO practices.
 
 
 It includes a modular scraping pipeline built with Python, Selenium, and Beautiful Soup
