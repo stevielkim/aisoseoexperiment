@@ -20,6 +20,10 @@ beautifulsoup4>=4.11.0
 bs4>=0.0.1
 lxml>=4.9.0
 
+# API integration
+openai>=1.0.0  # For API client patterns
+python-dotenv>=1.0.0  # For .env file loading
+
 # Development and testing (optional)
 pytest>=7.0.0
 black>=22.0.0

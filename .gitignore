@@ -1,2 +1,51 @@
+# Environment files
 .env
-.venv
+.env.local
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+compare_results/
+
+# Large data files (keep sample, ignore bulk data)
+*/ai_serp_analysis.csv
+ai_serp_analysis.csv
+
+# HTML result directories (large raw data)
+*/google_ai_search_results_html/
+*/bing_ai_search_results_html/
+*/perplexity_search_results_html/
+google_ai_search_results_html/
+bing_ai_search_results_html/
+perplexity_search_results_html/
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

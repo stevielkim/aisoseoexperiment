@@ -131,13 +131,13 @@ def extract_seo_elements(path: str, engine: str):
         struct = structure_metrics(soup)
         schema_flags = parse_jsonld_schema(soup)
 
-        # Overview container (TAG, not text)
+        # Overview container (TAG, not text) - Fixed selectors
         if engine == "Google AI":
-            overview_tag = soup.select_one("div.LGOjhe, div.ifM9O, div.KpMaL, div.SPZz6b, div.vk_c, ul.zVKf0d")
+            overview_tag = soup.select_one("div[data-huuid], div.LGOjhe, div.xpdopen, div.ifM9O, div.c2xzTb")
         elif engine == "Bing AI":
-            overview_tag = soup.select_one("cib-serp, div.b_factrow, div.dg_b, div.b_vlist2col")
+            overview_tag = soup.select_one("div.qna-mf .gs_text, div.qna-mf .gs_temp_content, div.qna-mf .gs_caphead_main")
         elif engine == "Perplexity":
-            overview_tag = soup.select_one("div.prose, div.gap-y-md")
+            overview_tag = soup.select_one("div.prose")  # More specific selector
         else:
             overview_tag = None
 
@@ -149,10 +149,29 @@ def extract_seo_elements(path: str, engine: str):
             for idx, a in enumerate(overview_tag.find_all("a", href=True), 1):
                 citations.append((idx, norm(real_href(a["href"]))))
 
-        # Iterate SERP result containers (blue links)
-        for rank, node in enumerate(soup.select("div.tF2Cxc, li.b_algo, div.result"), 1):
-            a_tag = node.find("a", href=True)
-            link = a_tag["href"] if a_tag else ""
+        # Iterate SERP result containers (blue links) - Fixed selectors
+        if engine == "Google AI":
+            result_selectors = "div.tF2Cxc, li.b_algo, div.result"
+        elif engine == "Bing AI":
+            result_selectors = "div.qna-mf .gs_cit, div.qna-mf .gs_cit_cont a, div.qna-mf .gs_sup_cit a"
+        elif engine == "Perplexity":
+            result_selectors = ".citation"  # Use the citation elements we found
+        else:
+            result_selectors = "div.tF2Cxc, li.b_algo, div.result"
+
+        for rank, node in enumerate(soup.select(result_selectors), 1):
+            if engine == "Perplexity":
+                # For Perplexity citations, find the href attribute or nested link
+                link = node.get("href", "")
+                if not link:
+                    # Look for nested a tag
+                    nested_a = node.find("a", href=True)
+                    link = nested_a["href"] if nested_a else ""
+                a_tag = node if node.get("href") else nested_a
+            else:
+                a_tag = node.find("a", href=True)
+                link = a_tag["href"] if a_tag else ""
+
             link_t = a_tag.get_text(strip=True) if a_tag else ""
             snippet = node.get_text(" ", strip=True)
 

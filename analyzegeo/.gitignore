@@ -1,0 +1,16 @@
+# Large data files - exclude raw HTML and CSV files to keep repo size manageable
+ai_serp_analysis.csv
+google_ai_search_results_html/
+bing_ai_search_results_html/
+perplexity_search_results_html/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+
+# IDE files
+.vscode/
+.DS_Store
