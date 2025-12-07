@@ -55,6 +55,11 @@ logs/
 # Jupyter notebook checkpoints
 .ipynb_checkpoints
 
-# Legacy directories (removed from project)
+# Legacy directories and files (not part of active codebase)
 analyzeseo/
 compare_results/
+analyzegeo/legacy/
+analyzegeo/.venv/
+analyzegeo/__pycache__/
+analyzegeo/.claude/
+analyzegeo/plots/
