@@ -14,6 +14,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from scipy import stats
+from scipy.stats import mannwhitneyu
+from statsmodels.stats.multitest import multipletests
+from statsmodels.stats.proportion import proportion_confint
 from collections import Counter
 import warnings
 warnings.filterwarnings('ignore')
@@ -21,6 +24,35 @@ warnings.filterwarnings('ignore')
 # Set style
 plt.style.use('default')
 sns.set_palette("viridis")
+
+def audit_data_quality(df, dataset_name="Dataset"):
+    """Flag potential data quality issues in citation data."""
+    if 'Included' not in df.columns:
+        return
+
+    inclusion_rate = df['Included'].mean()
+    n = len(df)
+
+    # Calculate 95% confidence interval
+    ci_low, ci_high = proportion_confint(
+        count=df['Included'].sum(),
+        nobs=n,
+        alpha=0.05,
+        method='wilson'
+    )
+
+    print(f"\n🔍 Data Quality Audit - {dataset_name}:")
+    print(f"   • Sample size: {n}")
+    print(f"   • Inclusion rate: {inclusion_rate:.1%} [{ci_low:.1%}, {ci_high:.1%}]")
+
+    if inclusion_rate > 0.90:
+        print(f"   ⚠️  WARNING: Inclusion rate suspiciously high")
+        print(f"       May indicate parser issues or biased sampling")
+    elif inclusion_rate < 0.05:
+        print(f"   ⚠️  WARNING: Inclusion rate suspiciously low")
+        print(f"       Parser may be too strict")
+    else:
+        print(f"   ✅ Inclusion rate within expected range")
 
 def load_ai_citation_data():
     """Load and prepare data for AI citation analysis (Perplexity focus)."""
@@ -110,7 +142,7 @@ def analyze_content_characteristics(df):
     print(f"📋 Available content features: {', '.join(available_features)}")
 
     if len(available_features) >= 3:
-        # Compare included vs not included citations
+        # IMPROVEMENT: Compare included vs not included with proper statistical testing
         included_df = df[df['Included'] == 1]
         excluded_df = df[df['Included'] == 0]
 
@@ -118,30 +150,71 @@ def analyze_content_characteristics(df):
         print(f"   Included citations: {len(included_df):,}")
         print(f"   Excluded citations: {len(excluded_df):,}")
 
+        # Collect all test results for FDR correction
+        test_results = []
+
         for feature in available_features:
             if feature in df.columns and df[feature].notna().sum() > 0:
-                included_mean = included_df[feature].mean()
-                excluded_mean = excluded_df[feature].mean()
+                included_vals = included_df[feature].dropna()
+                excluded_vals = excluded_df[feature].dropna()
 
-                # Statistical test
-                if len(included_df) > 0 and len(excluded_df) > 0:
-                    stat, p_value = stats.mannwhitneyu(
-                        included_df[feature].dropna(),
-                        excluded_df[feature].dropna(),
+                if len(included_vals) > 0 and len(excluded_vals) > 0:
+                    included_mean = included_vals.mean()
+                    excluded_mean = excluded_vals.mean()
+
+                    # Calculate confidence intervals using bootstrap
+                    included_ci_low = np.percentile(included_vals, 2.5)
+                    included_ci_high = np.percentile(included_vals, 97.5)
+                    excluded_ci_low = np.percentile(excluded_vals, 2.5)
+                    excluded_ci_high = np.percentile(excluded_vals, 97.5)
+
+                    # Statistical test
+                    stat, p_value = mannwhitneyu(
+                        included_vals,
+                        excluded_vals,
                         alternative='two-sided'
                     )
-                    significance = "***" if p_value < 0.001 else "**" if p_value < 0.01 else "*" if p_value < 0.05 else ""
 
                     difference = ((included_mean - excluded_mean) / excluded_mean * 100) if excluded_mean > 0 else 0
-                    print(f"   • {feature}:")
-                    print(f"     - Included: {included_mean:.1f}")
-                    print(f"     - Excluded: {excluded_mean:.1f}")
-                    print(f"     - Difference: {difference:+.1f}% {significance}")
 
-        return available_features
+                    test_results.append({
+                        'feature': feature,
+                        'included_mean': included_mean,
+                        'excluded_mean': excluded_mean,
+                        'included_ci': (included_ci_low, included_ci_high),
+                        'excluded_ci': (excluded_ci_low, excluded_ci_high),
+                        'difference_pct': difference,
+                        'p_value': p_value,
+                        'stat': stat
+                    })
+
+        # IMPROVEMENT: Apply FDR correction for multiple comparisons
+        if test_results:
+            p_values = [r['p_value'] for r in test_results]
+            reject, p_adj, _, _ = multipletests(p_values, method='fdr_bh')
+
+            # Add adjusted p-values and significance
+            for i, result in enumerate(test_results):
+                result['p_adj'] = p_adj[i]
+                result['significant'] = reject[i]
+
+            # Print results with adjusted p-values
+            print(f"\n   (P-values adjusted for multiple comparisons using FDR correction)")
+
+            for result in test_results:
+                sig_marker = "***" if result['significant'] else ""
+                print(f"   • {result['feature']}:")
+                print(f"     - Included: {result['included_mean']:.1f} "
+                      f"[{result['included_ci'][0]:.1f}, {result['included_ci'][1]:.1f}]")
+                print(f"     - Excluded: {result['excluded_mean']:.1f} "
+                      f"[{result['excluded_ci'][0]:.1f}, {result['excluded_ci'][1]:.1f}]")
+                print(f"     - Difference: {result['difference_pct']:+.1f}% "
+                      f"(p_adj={result['p_adj']:.4f}) {sig_marker}")
+
+        return available_features, test_results
     else:
         print("❌ Insufficient content features for analysis")
-        return []
+        return [], []
 
 def analyze_query_type_preferences(df):
     """Analyze AI citation preferences by query type."""
@@ -180,11 +253,17 @@ def citation_predictive_modeling(df, available_features):
     feature_data = df[available_features + ['Citation_Order']].fillna(df[available_features + ['Citation_Order']].median())
     target = df['Included']
 
-    # Check class distribution
+    # IMPROVEMENT: Analyze class imbalance
     class_dist = target.value_counts()
-    print(f"📊 Class distribution:")
-    print(f"   • Included: {class_dist.get(1, 0)} ({class_dist.get(1, 0)/len(target):.1%})")
-    print(f"   • Excluded: {class_dist.get(0, 0)} ({class_dist.get(0, 0)/len(target):.1%})")
+    class_ratio = target.mean()
+    imbalance_severity = ("extreme" if class_ratio < 0.1 or class_ratio > 0.9
+                         else "moderate" if class_ratio < 0.3 or class_ratio > 0.7
+                         else "mild")
+
+    print(f"📊 Model training data: {len(df)} records")
+    print(f"   • Included: {class_dist.get(1, 0)} ({class_ratio:.1%})")
+    print(f"   • Excluded: {class_dist.get(0, 0)} ({(1-class_ratio):.1%})")
+    print(f"   • Class imbalance: {imbalance_severity} (ratio={min(class_ratio, 1-class_ratio):.3f})")
 
     if target.nunique() < 2:
         print("❌ No variation in target variable - cannot build model")
@@ -195,6 +274,10 @@ def citation_predictive_modeling(df, available_features):
         feature_data, target, test_size=0.2, random_state=42, stratify=target
     )
 
+    print(f"\n📊 Data Split:")
+    print(f"   • Training set: {len(X_train)} records")
+    print(f"   • Test set: {len(X_test)} records")
+
     # Scale features
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
@@ -202,12 +285,25 @@ def citation_predictive_modeling(df, available_features):
 
     # Random Forest for citation inclusion
     rf = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
-    rf.fit(X_train_scaled, y_train)
 
     try:
+        # IMPROVEMENT: Cross-validation on training data only
         rf_scores = cross_val_score(rf, X_train_scaled, y_train, cv=min(5, len(y_train)))
-        print(f"🌳 Citation Inclusion Model:")
-        print(f"   • Cross-validation accuracy: {rf_scores.mean():.3f} (±{rf_scores.std()*2:.3f})")
+
+        # Fit and evaluate
+        rf.fit(X_train_scaled, y_train)
+        train_score = rf.score(X_train_scaled, y_train)
+        test_score = rf.score(X_test_scaled, y_test)
+
+        print(f"\n🌳 Citation Inclusion Model:")
+        print(f"   • CV accuracy (train): {rf_scores.mean():.3f} (±{rf_scores.std():.3f})")
+        print(f"   • Train accuracy: {train_score:.3f}")
+        print(f"   • Test accuracy: {test_score:.3f}")
+
+        if abs(train_score - test_score) > 0.1:
+            print(f"   ⚠️  Large train-test gap suggests overfitting")
+        else:
+            print(f"   ✅ Good generalization (small train-test gap)")
 
         # Feature importance
         all_features = available_features + ['Citation_Order']
@@ -223,6 +319,8 @@ def citation_predictive_modeling(df, available_features):
         return {
             'model': rf,
             'scores': rf_scores,
+            'train_score': train_score,
+            'test_score': test_score,
             'importance': importance_df,
             'scaler': scaler
         }
@@ -396,11 +494,20 @@ def main():
     # Load data
     df = load_ai_citation_data()
 
+    # IMPROVEMENT: Data quality audit
+    if 'Included' in df.columns:
+        audit_data_quality(df, "Perplexity Citations")
+
     # Analyze citation patterns
     citation_stats = analyze_citation_patterns(df)
 
     # Content characteristics analysis
-    available_features = analyze_content_characteristics(df)
+    result = analyze_content_characteristics(df)
+    if result and len(result) == 2:
+        available_features, test_results = result
+    else:
+        available_features = result if isinstance(result, list) else []
+        test_results = []
 
     # Query type preferences
     query_analysis = analyze_query_type_preferences(df)

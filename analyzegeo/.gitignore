@@ -14,3 +14,13 @@ __pycache__/
 # IDE files
 .vscode/
 .DS_Store
+
+# Archived: SEO comparison analysis (not relevant to core goal)
+analyze_traditional_seo.py
+analyze_combined_insights.py
+analyze_geo.py
+analyze_geo_enhanced.py
+engine_comparison_analysis.py
+METHODOLOGY.md
+plots/traditional_seo_analysis.png
+plots/combined_insights_analysis.png

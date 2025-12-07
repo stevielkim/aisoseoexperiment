@@ -11,12 +11,44 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 from scipy import stats
+from scipy.stats import mannwhitneyu, ttest_ind
+from statsmodels.stats.multitest import multipletests
+from statsmodels.stats.proportion import proportion_confint
 import warnings
 warnings.filterwarnings('ignore')
 
 # Set style
 plt.style.use('default')
 sns.set_palette("Set2")
+
+def audit_data_quality(df, dataset_name="Dataset"):
+    """Flag potential data quality issues in citation data."""
+    if 'Included' not in df.columns:
+        return
+
+    inclusion_rate = df['Included'].mean()
+    n = len(df)
+
+    # Calculate 95% confidence interval
+    ci_low, ci_high = proportion_confint(
+        count=df['Included'].sum(),
+        nobs=n,
+        alpha=0.05,
+        method='wilson'
+    )
+
+    print(f"\n🔍 Data Quality Audit - {dataset_name}:")
+    print(f"   • Sample size: {n}")
+    print(f"   • Inclusion rate: {inclusion_rate:.1%} [{ci_low:.1%}, {ci_high:.1%}]")
+
+    if inclusion_rate > 0.90:
+        print(f"   ⚠️  WARNING: Inclusion rate suspiciously high")
+        print(f"       May indicate parser issues or biased sampling")
+    elif inclusion_rate < 0.05:
+        print(f"   ⚠️  WARNING: Inclusion rate suspiciously low")
+        print(f"       Parser may be too strict")
+    else:
+        print(f"   ✅ Inclusion rate within expected range")
 
 def load_and_segment_data():
     """Load data and segment by engine type."""
@@ -91,9 +123,44 @@ def cross_engine_query_analysis(traditional_seo, ai_citations):
 
         comparison_df = pd.DataFrame(comparison_results)
 
-        print(f"\n🎯 Performance Comparison for Common Queries:")
-        print(f"   • Avg Traditional SEO inclusion: {comparison_df['traditional_inclusion'].mean():.1%}")
-        print(f"   • Avg AI Citation inclusion: {comparison_df['ai_inclusion'].mean():.1%}")
+        # IMPROVEMENT: Add statistical test for cross-engine difference
+        trad_mean = comparison_df['traditional_inclusion'].mean()
+        ai_mean = comparison_df['ai_inclusion'].mean()
+
+        # Calculate confidence intervals
+        trad_ci_low, trad_ci_high = proportion_confint(
+            count=int(trad_mean * len(comparison_df)),
+            nobs=len(comparison_df),
+            alpha=0.05,
+            method='wilson'
+        )
+        ai_ci_low, ai_ci_high = proportion_confint(
+            count=int(ai_mean * len(comparison_df)),
+            nobs=len(comparison_df),
+            alpha=0.05,
+            method='wilson'
+        )
+
+        # Paired t-test for cross-engine differences
+        if len(comparison_df) >= 3:
+            stat, p_value = ttest_ind(
+                comparison_df['traditional_inclusion'],
+                comparison_df['ai_inclusion']
+            )
+
+            print(f"\n🎯 Performance Comparison for Common Queries:")
+            print(f"   • Avg Traditional SEO inclusion: {trad_mean:.1%} [{trad_ci_low:.1%}, {trad_ci_high:.1%}]")
+            print(f"   • Avg AI Citation inclusion: {ai_mean:.1%} [{ai_ci_low:.1%}, {ai_ci_high:.1%}]")
+            print(f"   • Difference: {ai_mean - trad_mean:+.1%}")
+            print(f"   • Statistical test: t = {stat:.3f}, p = {p_value:.4f}")
+            if p_value < 0.05:
+                print(f"   ✅ Statistically significant difference between engines")
+            else:
+                print(f"   ⚠️  No significant difference between engines")
+        else:
+            print(f"\n🎯 Performance Comparison for Common Queries:")
+            print(f"   • Avg Traditional SEO inclusion: {trad_mean:.1%}")
+            print(f"   • Avg AI Citation inclusion: {ai_mean:.1%}")
 
         # Top queries where AI citations perform much better
         top_ai_advantage = comparison_df.nlargest(5, 'difference')
@@ -124,6 +191,7 @@ def analyze_content_optimization_insights(traditional_seo, ai_citations):
     print(f"📋 Analyzing common content features: {', '.join(available_features)}")
 
     insights = {}
+    test_results = []
 
     for feature in available_features:
         # Traditional SEO analysis
@@ -141,24 +209,55 @@ def analyze_content_optimization_insights(traditional_seo, ai_citations):
             'ai_excluded_mean': ai_excluded.mean() if len(ai_excluded) > 0 else 0
         }
 
-        # Calculate differences
+        # IMPROVEMENT: Calculate differences with statistical tests
         trad_diff = insights[feature]['traditional_included_mean'] - insights[feature]['traditional_excluded_mean']
         ai_diff = insights[feature]['ai_included_mean'] - insights[feature]['ai_excluded_mean']
+
+        # Statistical tests for within-engine differences
+        trad_p = np.nan
+        ai_p = np.nan
+
+        if len(trad_included) > 0 and len(trad_excluded) > 0:
+            _, trad_p = mannwhitneyu(trad_included, trad_excluded, alternative='two-sided')
+
+        if len(ai_included) > 0 and len(ai_excluded) > 0:
+            _, ai_p = mannwhitneyu(ai_included, ai_excluded, alternative='two-sided')
+
+        test_results.append({
+            'feature': feature,
+            'trad_p': trad_p,
+            'ai_p': ai_p
+        })
 
         print(f"\n📊 {feature}:")
         print(f"   Traditional SEO:")
         print(f"     • Included avg: {insights[feature]['traditional_included_mean']:.1f}")
         print(f"     • Excluded avg: {insights[feature]['traditional_excluded_mean']:.1f}")
-        print(f"     • Difference: {trad_diff:+.1f}")
+        print(f"     • Difference: {trad_diff:+.1f} (p={trad_p:.4f})" if not np.isnan(trad_p) else f"     • Difference: {trad_diff:+.1f}")
         print(f"   AI Citations:")
         print(f"     • Included avg: {insights[feature]['ai_included_mean']:.1f}")
         print(f"     • Excluded avg: {insights[feature]['ai_excluded_mean']:.1f}")
-        print(f"     • Difference: {ai_diff:+.1f}")
+        print(f"     • Difference: {ai_diff:+.1f} (p={ai_p:.4f})" if not np.isnan(ai_p) else f"     • Difference: {ai_diff:+.1f}")
 
-        # Determine optimization direction
-        if abs(trad_diff) > 10 or abs(ai_diff) > 10:  # Meaningful difference threshold
-            direction = "increase" if (trad_diff > 0 and ai_diff > 0) else "optimize carefully"
-            print(f"     → Recommendation: {direction}")
+        # IMPROVEMENT: Data-driven recommendation based on statistical significance
+        trad_significant = not np.isnan(trad_p) and trad_p < 0.05
+        ai_significant = not np.isnan(ai_p) and ai_p < 0.05
+
+        if trad_significant and ai_significant:
+            if trad_diff > 0 and ai_diff > 0:
+                print(f"     → Recommendation: ✅ Increase this feature (benefits both systems)")
+            elif trad_diff < 0 and ai_diff < 0:
+                print(f"     → Recommendation: ⚠️  Decrease or optimize carefully")
+            else:
+                print(f"     → Recommendation: ⚖️  Optimize separately for each system")
+        elif trad_significant:
+            direction = "increase" if trad_diff > 0 else "decrease"
+            print(f"     → Recommendation: Traditional SEO only - {direction}")
+        elif ai_significant:
+            direction = "increase" if ai_diff > 0 else "decrease"
+            print(f"     → Recommendation: AI citations only - {direction}")
+        else:
+            print(f"     → Recommendation: No significant impact detected")
 
     return insights
 
@@ -389,6 +488,14 @@ def main():
 
     # Load and segment data
     df, traditional_seo, ai_citations = load_and_segment_data()
+
+    # IMPROVEMENT: Data quality audit for each engine
+    if 'Included' in df.columns:
+        audit_data_quality(df, "All Engines")
+
+        for engine in df['Engine'].unique():
+            engine_df = df[df['Engine'] == engine]
+            audit_data_quality(engine_df, engine)
 
     # Cross-engine query analysis
     comparison_df = cross_engine_query_analysis(traditional_seo, ai_citations)

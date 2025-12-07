@@ -133,27 +133,41 @@ def extract_seo_elements(path: str, engine: str):
 
         # Overview container (TAG, not text) - Fixed selectors
         if engine == "Google AI":
-            overview_tag = soup.select_one("div[data-huuid], div.LGOjhe, div.xpdopen, div.ifM9O, div.c2xzTb")
+            # div.LGOjhe = AI Overview text, div.e9EfHf = full AI block with citations
+            overview_tag = soup.select_one("div.LGOjhe, div[data-huuid], div.xpdopen, div.ifM9O, div.c2xzTb")
+            # For citations, use the full AI block container
+            citation_container = soup.select_one("div.e9EfHf")
         elif engine == "Bing AI":
-            overview_tag = soup.select_one("div.qna-mf .gs_text, div.qna-mf .gs_temp_content, div.qna-mf .gs_caphead_main")
+            # Bing Copilot uses various containers
+            overview_tag = soup.select_one("div.qna-mf, div.b_ans, div[id='b_results']")
+            # Citations can be in gs_sm_cit, gs_sup_cit containers
+            citation_container = soup.select_one("div.gs_sm_cit, div.gs_sup_cit, div.qna-mf") or overview_tag
         elif engine == "Perplexity":
             overview_tag = soup.select_one("div.prose")  # More specific selector
+            citation_container = overview_tag
         else:
             overview_tag = None
+            citation_container = None
 
         overview_text = overview_tag.get_text(" ", strip=True) if overview_tag else ""
 
         # Citation anchors (use href, strip redirect, normalize)
+        # For Google AI, look in the full AI block (e9EfHf) which contains sidebar citations
         citations = []
-        if overview_tag:
-            for idx, a in enumerate(overview_tag.find_all("a", href=True), 1):
-                citations.append((idx, norm(real_href(a["href"]))))
+        citation_source = citation_container if citation_container else overview_tag
+        if citation_source:
+            for idx, a in enumerate(citation_source.find_all("a", href=True), 1):
+                href = real_href(a["href"])
+                # Filter out Google internal links
+                if href and href.startswith(("http://", "https://")) and "google.com" not in href and "gstatic" not in href:
+                    citations.append((idx, norm(href)))
 
         # Iterate SERP result containers (blue links) - Fixed selectors
         if engine == "Google AI":
             result_selectors = "div.tF2Cxc, li.b_algo, div.result"
         elif engine == "Bing AI":
-            result_selectors = "div.qna-mf .gs_cit, div.qna-mf .gs_cit_cont a, div.qna-mf .gs_sup_cit a"
+            # Bing uses li.b_algo for search results, gs_sm_cit for AI citations
+            result_selectors = "li.b_algo, div.gs_sm_cit, div.gs_sup_cit, div.b_attribution"
         elif engine == "Perplexity":
             result_selectors = ".citation"  # Use the citation elements we found
         else:
