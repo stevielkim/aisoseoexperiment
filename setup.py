@@ -3,8 +3,9 @@
 from setuptools import setup, find_packages
 
 # Read requirements from requirements.txt
-with open('requirements.txt') as f:
-    requirements = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+# Only include essential runtime dependencies, not version-pinned ones
+# (let the existing environment handle dependency management)
+requirements = []
 
 setup(
     name='geoseo_analysis',
