@@ -139,18 +139,19 @@ open outputs/figures/content_feature_analysis.png
 
 | Document | Description | Audience |
 |----------|-------------|----------|
-| **[METHODOLOGY.md](docs/METHODOLOGY.md)** | Statistical methods explained with external links | Beginner-Intermediate |
-| **[RESULTS.md](docs/RESULTS.md)** | Detailed findings with embedded visualizations | All levels |
-| **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** | Code organization & what goes where | Developers |
-| **[USAGE_GUIDE.md](docs/USAGE_GUIDE.md)** | Step-by-step pipeline instructions | Users |
-| **[DATA_QUALITY.md](docs/DATA_QUALITY.md)** | Data collection & quality assessment | Technical |
+| **[METHODOLOGY.md](docs/METHODOLOGY.md)** | 11 statistical methods explained (Benjamini-Hochberg FDR, Wilson Score CI, Random Forest, etc.) with code examples and external learning links | Beginner-Intermediate |
+| **[RESULTS.md](docs/RESULTS.md)** | Comprehensive findings with embedded visualizations, detailed statistics, and limitations. Includes Traditional SEO analysis, Content Feature analysis, Perplexity analysis, and cross-engine synthesis | All levels |
+| **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** | Code organization guide - what goes where, refactoring status, how to navigate the modular structure | Developers |
+| **[USAGE_GUIDE.md](docs/USAGE_GUIDE.md)** | Step-by-step pipeline instructions (scrape → parse → extract → analyze) | Users |
+| **[DATA_QUALITY.md](docs/DATA_QUALITY.md)** | Data collection process, quality assessment, and known issues (Google AI 99% rate, Bing AI deferred) | Technical |
 
 ### Quick Navigation
 
-- 🤔 **Want to understand the statistics?** → [METHODOLOGY.md](docs/METHODOLOGY.md)
-- 📊 **Want to see the findings?** → [RESULTS.md](docs/RESULTS.md)
-- 🚀 **Want to run it yourself?** → [USAGE_GUIDE.md](docs/USAGE_GUIDE.md)
-- 🗺️ **Want to navigate the code?** → [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
+- 🤔 **Want to understand the statistics?** → [METHODOLOGY.md](docs/METHODOLOGY.md) - Learn about FDR correction, train-test splits, odds ratios, and more
+- 📊 **Want to see the findings?** → [RESULTS.md](docs/RESULTS.md) - View 4 dashboards with detailed analysis and key takeaways
+- 🚀 **Want to run it yourself?** → [USAGE_GUIDE.md](docs/USAGE_GUIDE.md) - Step-by-step instructions for the full pipeline
+- 🗺️ **Want to navigate the code?** → [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Understand the modular Python structure
+- 🔍 **Want to assess data quality?** → [DATA_QUALITY.md](docs/DATA_QUALITY.md) - Known limitations and quality metrics
 
 ---
 
