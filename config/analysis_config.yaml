@@ -1,0 +1,137 @@
+# GeoSEO Analysis Configuration
+# Configuration file for SEO vs AISO dual-track analysis
+
+# Data paths
+data:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  html:
+    google_ai: data/raw/html/google_ai_search_results_html
+    bing_ai: data/raw/html/bing_ai_search_results_html
+    perplexity: data/raw/html/perplexity_search_results_html
+
+# Output paths
+outputs:
+  figures: outputs/figures
+  reports: outputs/reports
+  models: outputs/models
+
+# Analysis parameters
+analysis:
+  random_seed: 42
+  test_split: 0.2
+  cv_folds: 5
+  fdr_alpha: 0.05
+  confidence_level: 0.95
+
+# Feature definitions
+features:
+  content:
+    - Word Count
+    - Sentence Count
+    - H1 Count
+    - H2 Count
+    - H3 Count
+    - MetaDesc Length
+    - List Count
+    - Image Count
+    - Link Count
+    - Paragraph Count
+
+  schema:
+    - FAQ Schema
+    - HowTo Schema
+    - Article Schema
+    - Review Schema
+    - Recipe Schema
+
+  content_types:
+    - How-to
+    - Listicle
+    - Comparison
+    - Q&A
+    - Definition
+    - Data-rich
+
+# CSS selectors for parsing
+selectors:
+  google_ai:
+    overview:
+      - "div[data-initq]"
+      - "div.ai-overview"
+      - "div[data-attrid='AIOverview']"
+    citations:
+      - "a[href^='http']"
+      - "div.source-link a"
+
+  bing_copilot:
+    overview:
+      - "cib-serp"
+      - "cib-conversation"
+      - "cib-message-group"
+    citations:
+      - "a[href^='http']"
+      - "cib-citation"
+
+  perplexity:
+    answer:
+      - "div.answer"
+      - "div.prose"
+    citations:
+      - "a[href^='http']"
+      - "cite a"
+
+# Engine-specific settings
+engines:
+  google_ai:
+    name: "Google AI Overview"
+    enabled: true
+    wait_time: 3
+
+  bing_ai:
+    name: "Bing Copilot"
+    enabled: false  # Deferred due to scraper issues
+    wait_time: 5
+
+  perplexity:
+    name: "Perplexity AI"
+    enabled: true
+    wait_time: 3
+
+# Model training parameters
+models:
+  random_forest:
+    n_estimators: 100
+    random_state: 42
+    class_weight: balanced
+    max_depth: null
+    min_samples_split: 2
+    min_samples_leaf: 1
+
+  logistic_regression:
+    random_state: 42
+    max_iter: 1000
+    class_weight: balanced
+    solver: lbfgs
+
+# Visualization settings
+visualization:
+  style: default
+  palette: viridis
+  figure_size: [16, 12]
+  dpi: 150
+  save_format: png
+
+# Statistical testing
+statistics:
+  alpha: 0.05
+  fdr_method: fdr_bh
+  normality_test: shapiro
+  correlation_method: auto  # auto, pearson, spearman
+
+# Logging
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: logs/analysis.log

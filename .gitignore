@@ -3,6 +3,7 @@
 .env.local
 .venv/
 venv/
+env/
 
 # Python cache
 __pycache__/
@@ -10,12 +11,16 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+*.egg-info/
+dist/
+build/
 
 # IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+.ipynb_checkpoints/
 
 # System files
 .DS_Store
@@ -26,20 +31,17 @@ __pycache__/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
-compare_results/
+# Data directories (too large for git)
+data/raw/
+data/interim/
+data/processed/
 
-# Large data files (keep sample, ignore bulk data)
-*/ai_serp_analysis.csv
-ai_serp_analysis.csv
-
-# HTML result directories (large raw data)
-*/google_ai_search_results_html/
-*/bing_ai_search_results_html/
-*/perplexity_search_results_html/
-google_ai_search_results_html/
-bing_ai_search_results_html/
-perplexity_search_results_html/
+# Output files
+outputs/figures/*.png
+outputs/reports/*.pdf
+outputs/reports/*.html
+outputs/models/*.pkl
+outputs/models/*.joblib
 
 # Log files
 *.log
@@ -49,3 +51,10 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints
+
+# Legacy directories (removed from project)
+analyzeseo/
+compare_results/
