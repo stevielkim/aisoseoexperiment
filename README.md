@@ -1,4 +1,4 @@
-# SEO vs AISO: What Drives AI Search Engine Citations?
+# SEO vs AEO: What Drives AI Search Engine Citations?
 
 **A comprehensive analysis of what content features predict citation in AI-powered search engines (Google AI Overview, Bing Copilot, Perplexity AI)**
 
