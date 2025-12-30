@@ -3,10 +3,11 @@ import os, re, json, pandas as pd
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
-PERPLEXITY_DIR = "perplexity_search_results_html"
-GOOGLE_AI_DIR  = "google_ai_search_results_html"
-BING_AI_DIR    = "bing_ai_search_results_html"
-OUTPUT_FILE    = "ai_serp_analysis.csv"
+# Use timestamped directories from latest scraping run
+PERPLEXITY_DIR = "data/raw/html/perplexity_search_results_html_20251223_121620"
+GOOGLE_AI_DIR  = "data/raw/html/google_ai_search_results_html_20251223_121620"
+BING_AI_DIR    = "data/raw/html/bing_ai_search_results_html"  # Skip - no new data
+OUTPUT_FILE    = "data/processed/ai_serp_analysis_20251223.csv"
 
 results = []
 
@@ -131,36 +132,41 @@ def extract_seo_elements(path: str, engine: str):
         struct = structure_metrics(soup)
         schema_flags = parse_jsonld_schema(soup)
 
-        # Overview container (TAG, not text) - Fixed selectors
+        # Overview container (TAG, not text)
+        # REVERTED TO AUGUST 12 LOGIC: Use same container for overview text AND citations
         if engine == "Google AI":
-            # div.LGOjhe = AI Overview text, div.e9EfHf = full AI block with citations
-            overview_tag = soup.select_one("div.LGOjhe, div[data-huuid], div.xpdopen, div.ifM9O, div.c2xzTb")
-            # For citations, use the full AI block container
-            citation_container = soup.select_one("div.e9EfHf")
+            overview_tag = soup.select_one("div.LGOjhe, div.ifM9O, div.KpMaL, div.SPZz6b, div.vk_c, ul.zVKf0d")
         elif engine == "Bing AI":
-            # Bing Copilot uses various containers
-            overview_tag = soup.select_one("div.qna-mf, div.b_ans, div[id='b_results']")
-            # Citations can be in gs_sm_cit, gs_sup_cit containers
-            citation_container = soup.select_one("div.gs_sm_cit, div.gs_sup_cit, div.qna-mf") or overview_tag
+            # For Bing, look for iframe content embedded by scraper
+            iframe_content = soup.find(string=lambda text: text and "IFRAME_CONTENT_START" in text)
+            if iframe_content:
+                # Extract and parse the iframe HTML
+                iframe_html_match = re.search(r'<!-- IFRAME_CONTENT_START -->(.*?)<!-- IFRAME_CONTENT_END -->',
+                                             str(soup), re.DOTALL)
+                if iframe_html_match:
+                    iframe_soup = BeautifulSoup(iframe_html_match.group(1), 'html.parser')
+                    # Look for citations in the iframe (Bing SERP result structure)
+                    overview_tag = iframe_soup.select_one("body")  # Get all iframe content
+                else:
+                    overview_tag = soup.select_one("#b_copilot_search")
+            else:
+                # Fallback to old method
+                overview_tag = soup.select_one("#b_copilot_search .b_cs_canvas, #b_copilot_search .ca_container")
+                if not overview_tag:
+                    overview_tag = soup.select_one("#b_copilot_search")
         elif engine == "Perplexity":
-            overview_tag = soup.select_one("div.prose")  # More specific selector
-            citation_container = overview_tag
+            overview_tag = soup.select_one("div.prose, div.gap-y-md")
         else:
             overview_tag = None
-            citation_container = None
 
         overview_text = overview_tag.get_text(" ", strip=True) if overview_tag else ""
 
         # Citation anchors (use href, strip redirect, normalize)
-        # For Google AI, look in the full AI block (e9EfHf) which contains sidebar citations
+        # Extract citations from SAME container as overview text
         citations = []
-        citation_source = citation_container if citation_container else overview_tag
-        if citation_source:
-            for idx, a in enumerate(citation_source.find_all("a", href=True), 1):
-                href = real_href(a["href"])
-                # Filter out Google internal links
-                if href and href.startswith(("http://", "https://")) and "google.com" not in href and "gstatic" not in href:
-                    citations.append((idx, norm(href)))
+        if overview_tag:
+            for idx, a in enumerate(overview_tag.find_all("a", href=True), 1):
+                citations.append((idx, norm(real_href(a["href"]))))
 
         # Iterate SERP result containers (blue links) - Fixed selectors
         if engine == "Google AI":

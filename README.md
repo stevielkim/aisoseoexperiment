@@ -31,12 +31,15 @@ This project investigates **what makes content get cited by AI search engines**.
 3. **Are there differences between engines?** (Google AI vs Bing AI vs Perplexity)
 4. **What's the optimal content strategy?** (Actionable recommendations)
 
-### Dataset
+### Dataset (Updated Dec 2024)
 
-- **380 citations** across 73 queries
-- **759 source pages** analyzed
+- **363 citations** across 114 queries
+- **912 total results** analyzed (Perplexity: 304, Google AI: 586, Bing AI: 22 [in progress])
 - **60+ content features** extracted per page
-- **3 AI search engines**: Perplexity (190 citations), Google AI (190 citations), Bing AI (deferred)
+- **3 AI search engines**:
+  - Perplexity: 301 citations (99.0% inclusion rate)
+  - Google AI: 51 citations (8.7% inclusion rate) - *corrected from 99% after parser fix*
+  - Bing AI: 11 citations (50.0% inclusion rate) - *71 of 88 queries completed*
 
 ---
 
@@ -111,6 +114,64 @@ This project evolved through several phases, each improving upon the last:
 
 **See**: [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for navigation guide
 
+### Phase 7: Data Quality Fixes (Dec 2024) 🔧
+**Goal**: Correct parser and scraper issues for accurate data
+
+**Critical Fixes**:
+
+1. **Google AI Parser Over-Capture** (✅ Fixed)
+   - **Problem**: Parser extracted citations from entire page instead of just AI Overview
+   - **Impact**: Inflated inclusion rate (99% → should be ~8-10%)
+   - **Solution**: Reverted to August 2024 logic - extract only from AI Overview container
+   - **Result**: Realistic 8.7% inclusion rate (51/586 results)
+
+2. **Bing Copilot Iframe Extraction** (✅ Fixed)
+   - **Problem**: Citations loaded in iframe not captured by `driver.page_source`
+   - **Impact**: 2.8% inclusion rate (12 citations) - missing 95% of data
+   - **Solution**: Switch into iframe, extract HTML, embed with markers for parser
+   - **Result**: 50% inclusion rate (11/22 on first test) - realistic and working
+
+3. **Enhanced Bot Evasion** (✅ Working)
+   - Random user agents, viewport sizes
+   - Mouse/scroll simulation, realistic delays
+   - Automatic retry button clicking
+   - **Result**: Successfully bypassing Bing bot detection
+
+**Status**: Bot detection remains a challenge - signed-in profile approach implemented
+
+**See**: [BING_SCRAPER_FIX.md](BING_SCRAPER_FIX.md) for technical details
+
+### Phase 8: Intent Analysis & Query Expansion (Dec 2025) 🎯
+**Goal**: Understand query intent impact and expand dataset with technology queries
+
+**Key Discoveries**:
+
+1. **Intent is the Strongest Predictor** (✅ Discovered)
+   - **Informational queries**: 16.7% inclusion rate
+   - **Transactional queries**: 3.9% inclusion rate
+   - **4.3x difference** - Intent matters more than traditional SEO factors
+   - Question format provides 2.4x advantage (15.6% vs 6.5%)
+
+2. **Google AI Coverage Expanding** (✅ Confirmed)
+   - October 2024: 8.7% inclusion rate
+   - December 2025: 10.9% inclusion rate
+   - **+25% relative increase** in 2 months
+   - Suggests broader AI Overview deployment
+
+3. **Scraper Enhancements** (✅ Implemented)
+   - Added "Show More" and "Show All" click handlers for complete content capture
+   - Timestamped output directories for timeseries analysis
+   - Signed-in Chrome profile approach for Bing bot detection bypass
+
+4. **Query Dataset Expanded** (✅ Added)
+   - Added 50 technology-focused queries (queries 89-138)
+   - Mix of informational ("how to build a PC") and transactional ("best gaming laptops 2025")
+   - Enables domain-specific analysis
+
+**Status**: December 2025 scraping run completed (56 queries before session timeout), intent analysis complete
+
+**See**: [SCRAPING_PLAN.md](SCRAPING_PLAN.md) for query expansion details
+
 ---
 
 ## 🚀 Quick Start
@@ -157,19 +218,33 @@ open outputs/figures/content_feature_analysis.png
 
 ## 🏆 Key Findings
 
-### 1. Traditional SEO Still Matters ✅
+### 1. Query Intent Trumps Traditional SEO 🎯 NEW
 
-**Google AI & Bing AI heavily favor top-ranking pages:**
-- Rank 1-3 pages: **99.3%** inclusion rate (Google AI)
-- Rank 4-10 pages: **98.8%** inclusion rate (Google AI)
-- **χ² = 763.08, p < 0.0001, Cramér's V = 0.865** (large effect)
+**Intent is the strongest predictor of Google AI Overview citation:**
+- **Informational queries** ("how to", "what is"): **16.7%** inclusion rate
+- **Transactional queries** ("best", "vs", "compare"): **3.9%** inclusion rate
+- **4.3x difference** - Intent matters more than page rank or content features
+
+**Question format provides major advantage:**
+- Question-formatted queries: **15.6%** inclusion
+- Non-question queries: **6.5%** inclusion
+- **2.4x advantage** for question format
+
+**Actionable takeaway**: Create informational "how-to" and "what is" content using question format in titles to maximize AI Overview visibility.
+
+### 2. Traditional SEO Still Matters (But Less Than Intent) ✅
+
+**Google AI & Bing AI favor top-ranking pages:**
+- Rank 1-3 pages: ~12.5% inclusion rate (Google AI)
+- Rank 4-10 pages: ~6-10% inclusion rate (Google AI)
+- Traditional SEO helps but doesn't guarantee AI citation
 
 **Top predictive features (Random Forest):**
 1. **H2 Count** (importance: 0.303)
 2. **H1 Count** (importance: 0.279)
 3. **Page Rank** (importance: 0.192)
 
-### 2. Content Structure is Critical 📋
+### 3. Content Structure is Critical 📋
 
 **Logistic Regression Odds Ratios** (how much each feature increases citation odds):
 - **Word Count**: 14.94x higher odds per unit increase

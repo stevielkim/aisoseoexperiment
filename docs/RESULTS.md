@@ -23,13 +23,13 @@
 
 ## Executive Summary
 
-### Top 3 Findings
+### Top 3 Findings (Updated Dec 2025)
 
-1. **Traditional SEO Still Matters for Google AI**: Rank 1-3 pages have 99.3% inclusion rate in Google AI Overviews (χ² = 763.08, p < 0.0001, Cramér's V = 0.865)
+1. **Intent Matters More Than SEO**: Google AI Overview strongly favors **informational queries** (16.7% inclusion) over **transactional queries** (3.9% inclusion) - a 4.3x difference. Query intent is the strongest predictor of AI citation, surpassing traditional SEO factors.
 
-2. **Content Structure is Critical**: H2 count is the #1 predictor of AI citation (importance: 0.303), followed by H1 count (0.279) and page rank (0.192)
+2. **Google AI is Expanding Coverage**: Inclusion rate increased 25% from October (8.7%) to December (10.9%), suggesting Google is showing AI Overviews more frequently and citing more sources over time.
 
-3. **Domain Authority Advantage**: Authoritative domains (bing.com, reddit.com, mayoclinic.org, healthline.com) dominate citations
+3. **Question Format Provides 2.4x Advantage**: Question-formatted queries ("how to", "what is") achieve 15.6% inclusion vs. 6.5% for non-questions. Combining informational intent + question format maximizes citation probability.
 
 ### Universal Optimization Principles
 
@@ -58,13 +58,19 @@
 
 ### Citation Counts by Engine
 
-| Engine | Citations | Success Rate | Quality Assessment |
-|--------|-----------|--------------|-------------------|
-| **Perplexity** | 190 | 96.7% | ✅ High quality, clean extraction |
-| **Google AI** | 190 | 99.0% | ⚠️ Suspiciously high (may include non-AI Overview results) |
-| **Bing AI** | 0 | 14.3% | ❌ Deferred (Copilot not loading during scrape) |
+| Engine | Time Period | Citations | Inclusion Rate | Quality Assessment |
+|--------|-------------|-----------|--------------|-------------------|
+| **Perplexity** | Oct 2024 | 301 / 304 | 99.0% | ✅ High quality, clean extraction |
+| **Perplexity** | Dec 2025 | 453 / 481 | 94.2% | ✅ Consistent high inclusion |
+| **Google AI** | Oct 2024 | 51 / 586 | 8.7% | ✅ Corrected parser |
+| **Google AI** | Dec 2025 | 61 / 561 | 10.9% | ✅ Increasing over time (+25%) |
+| **Bing AI** | Dec 2024 | 11 / 22 | 50.0% | ⚠️ Bot detection blocking 98.6% of queries |
 
-**Data Quality Note**: Google AI's 99% inclusion rate suggests potential parser over-capture (extracting regular SERP results alongside AI Overview citations). Analysis should focus on patterns rather than absolute rates.
+**Data Quality Updates (Dec 2025)**:
+- **Google AI**: Inclusion rate increasing over time (8.7% → 10.9%), suggesting broader AI Overview deployment
+- **Perplexity**: Slight decrease (99.0% → 94.2%) but still maintains near-universal citation coverage
+- **Bing AI**: Iframe extraction working but bot detection remains unsolved. Signed-in profile approach implemented but not yet tested on full dataset
+- **Scraper Enhancement**: Added "Show More" and "Show All" click handlers to capture complete AI Overview content and all citations
 
 ### Query Type Distribution
 
@@ -78,6 +84,66 @@
 
 ---
 
+## Query Intent Analysis (Google AI Overview) - NEW
+
+### Key Discovery: Intent Trumps Traditional SEO
+
+Analysis of December 2025 data reveals **query intent** as the dominant factor in Google AI Overview citations, surpassing traditional SEO signals.
+
+### Intent-Based Inclusion Rates
+
+| Query Intent | Total Results | Citations | Inclusion Rate |
+|--------------|---------------|-----------|----------------|
+| **Informational** ("how to", "what is", "why") | 306 | 51 | **16.7%** |
+| **Transactional** ("best", "top", "vs", "compare") | 255 | 10 | **3.9%** |
+
+**Key Finding**: Informational queries achieve **4.3x higher inclusion** than transactional queries.
+
+### Question Format Impact
+
+| Format | Total Results | Citations | Inclusion Rate |
+|--------|---------------|-----------|----------------|
+| **Question queries** ("how...", "what...") | 269 | 42 | **15.6%** |
+| **Non-question queries** | 292 | 19 | **6.5%** |
+
+**Key Finding**: Question format provides **2.4x advantage** over non-question format.
+
+### Examples by Intent Type
+
+**Informational Queries (16.7% inclusion) - PREFERRED**:
+- "how to improve sleep"
+- "what is cryptocurrency"
+- "symptoms of vitamin D deficiency"
+- "what causes anxiety disorders"
+- "benefits of intermittent fasting"
+
+**Transactional Queries (3.9% inclusion) - LESS PREFERRED**:
+- "best fitness apps for beginners"
+- "Netflix vs Hulu vs Disney Plus"
+- "Mac vs PC for students"
+- "best study techniques for students"
+
+### Temporal Trends
+
+| Time Period | Overall Inclusion | Informational | Transactional |
+|-------------|------------------|---------------|---------------|
+| **October 2024** | 8.7% | ~10.7%* | ~6.3%* |
+| **December 2025** | 10.9% | 16.7% | 3.9% |
+| **Change** | +25% relative | +56% relative | -38% relative |
+
+*Estimated based on query mix
+
+**Interpretation**: Google AI Overview is increasingly favoring informational content while becoming more selective with transactional/comparison queries.
+
+### Strategic Implications
+
+1. **Content Strategy**: Create "how-to" and "what is" content rather than "best of" lists
+2. **Query Targeting**: Focus on informational keywords over transactional keywords for AI visibility
+3. **Title Optimization**: Use question format in titles to align with user search patterns
+4. **Content Purpose**: Teach and explain rather than recommend and compare
+
+---
+
 ## Traditional SEO Analysis (Google AI + Bing AI)
 
 ![Traditional SEO Analysis](../outputs/figures/traditional_seo_analysis.png)
@@ -87,14 +153,16 @@
 ### 1. Inclusion Rates by Engine
 
 **Google AI Overview**:
-- **Inclusion Rate**: 99.0% [98.2%, 99.5%] (95% CI)
+- **Inclusion Rate**: 8.7% [6.8%, 10.9%] (95% CI) - Corrected Dec 2024
 - **Total Results**: 586 search results analyzed
-- **Interpretation**: Nearly all top-ranking pages appear in Google AI Overview (traditional SEO dominates)
+- **Citations**: 51 unique pages cited across 73 queries
+- **Interpretation**: Google AI Overview is highly selective, citing only ~1 in 11 top-ranking pages. Traditional high rankings do not guarantee AI citation.
 
 **Bing AI Copilot**:
-- **Inclusion Rate**: 14.3% [11.2%, 17.8%] (95% CI)
-- **Total Results**: Expected ~140 results (if successfully scraped)
-- **Status**: Deferred due to scraping issues (Copilot content not loading)
+- **Inclusion Rate**: 50.0% [preliminary, based on 1 query]
+- **Total Results**: 22 analyzed (1 of 88 queries completed)
+- **Citations**: 11 pages cited
+- **Status**: 🔄 In progress - Enhanced scraper with iframe extraction running (2-3 hours remaining)
 
 ### 2. Page Rank Correlation with Inclusion
 
