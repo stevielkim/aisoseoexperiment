@@ -60,11 +60,11 @@
 
 | Engine | Time Period | Citations | Inclusion Rate | Quality Assessment |
 |--------|-------------|-----------|--------------|-------------------|
-| **Perplexity** | Oct 2024 | 301 / 304 | 99.0% | ✅ High quality, clean extraction |
+| **Perplexity** | Oct 2025 | 301 / 304 | 99.0% | ✅ High quality, clean extraction |
 | **Perplexity** | Dec 2025 | 453 / 481 | 94.2% | ✅ Consistent high inclusion |
-| **Google AI** | Oct 2024 | 51 / 586 | 8.7% | ✅ Corrected parser |
+| **Google AI** | Oct 2025 | 51 / 586 | 8.7% | ✅ Corrected parser |
 | **Google AI** | Dec 2025 | 61 / 561 | 10.9% | ✅ Increasing over time (+25%) |
-| **Bing AI** | Dec 2024 | 11 / 22 | 50.0% | ⚠️ Bot detection blocking 98.6% of queries |
+| **Bing AI** | Dec 2025 | 11 / 22 | 50.0% | ⚠️ Bot detection blocking 98.6% of queries |
 
 **Data Quality Updates (Dec 2025)**:
 - **Google AI**: Inclusion rate increasing over time (8.7% → 10.9%), suggesting broader AI Overview deployment
@@ -127,7 +127,7 @@ Analysis of December 2025 data reveals **query intent** as the dominant factor i
 
 | Time Period | Overall Inclusion | Informational | Transactional |
 |-------------|------------------|---------------|---------------|
-| **October 2024** | 8.7% | ~10.7%* | ~6.3%* |
+| **October 2025** | 8.7% | ~10.7%* | ~6.3%* |
 | **December 2025** | 10.9% | 16.7% | 3.9% |
 | **Change** | +25% relative | +56% relative | -38% relative |
 

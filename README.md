@@ -153,7 +153,7 @@ This project evolved through several phases, each improving upon the last:
    - Question format provides 2.4x advantage (15.6% vs 6.5%)
 
 2. **Google AI Coverage Expanding** (✅ Confirmed)
-   - October 2024: 8.7% inclusion rate
+   - October 2025: 8.7% inclusion rate
    - December 2025: 10.9% inclusion rate
    - **+25% relative increase** in 2 months
    - Suggests broader AI Overview deployment
